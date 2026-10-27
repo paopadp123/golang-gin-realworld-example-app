@@ -7,6 +7,11 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// UseRandomJWTSecretForTests sets a random signing secret, so tests never depend on a fixed one
+func UseRandomJWTSecretForTests() {
+	jwtSecret = []byte(RandString(48))
+}
+
 // HeaderTokenMock adds authorization token to request header for testing
 func HeaderTokenMock(req *http.Request, u uint) {
 	req.Header.Set("Authorization", fmt.Sprintf("Token %v", GenToken(u)))
@@ -24,7 +29,7 @@ func ExtractTokenFromHeader(authHeader string) string {
 // VerifyTokenClaims verifies a JWT token and returns claims for testing
 func VerifyTokenClaims(tokenString string) (jwt.MapClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, jwt.MapClaims{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte(JWTSecret), nil
+		return JWTSecret(), nil
 	})
 
 	if err != nil {

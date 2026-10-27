@@ -545,7 +545,57 @@ func TestAuthMiddlewareNoToken(t *testing.T) {
 
 // This is a hack way to add test database for each case, as whole test will just share one database.
 // You can read TestWithoutAuth's comment to know how to not share database each case.
+func TestUsersLoginWithMalformedJSONReturns400(t *testing.T) {
+	asserts := assert.New(t)
+
+	r := gin.New()
+	UsersRegister(r.Group("/users"))
+
+	req, _ := http.NewRequest("POST", "/users/login", bytes.NewBufferString(`{"user": {"email": `))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	asserts.NotPanics(func() { r.ServeHTTP(w, req) }, "malformed JSON must not panic the handler")
+	asserts.Equal(http.StatusBadRequest, w.Code, "malformed JSON should return 400")
+}
+
+func TestAuthMiddlewareRejectsTokenOfMissingUser(t *testing.T) {
+	asserts := assert.New(t)
+	resetDBWithMock()
+
+	r := gin.New()
+	r.Use(AuthMiddleware(true))
+	r.GET("/test", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"user_id": c.MustGet("my_user_id").(uint)})
+	})
+
+	// A valid signature for a user that does not exist (deleted, or a forged id)
+	req, _ := http.NewRequest("GET", "/test", nil)
+	common.HeaderTokenMock(req, 99999)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	asserts.Equal(http.StatusUnauthorized, w.Code, "a token of a missing user should return 401")
+}
+
+func TestAuthMiddlewareOptionalTreatsMissingUserAsAnonymous(t *testing.T) {
+	asserts := assert.New(t)
+	resetDBWithMock()
+
+	r := gin.New()
+	r.Use(AuthMiddleware(false))
+	r.GET("/test", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"user_id": c.MustGet("my_user_id").(uint)})
+	})
+
+	req, _ := http.NewRequest("GET", "/test", nil)
+	common.HeaderTokenMock(req, 99999)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	asserts.Equal(http.StatusOK, w.Code)
+	asserts.Contains(w.Body.String(), `"user_id":0`, "a missing user should be treated as anonymous")
+}
+
 func TestMain(m *testing.M) {
+	common.UseRandomJWTSecretForTests()
 	test_db = common.TestDBInit()
 	AutoMigrate()
 	exitVal := m.Run()
