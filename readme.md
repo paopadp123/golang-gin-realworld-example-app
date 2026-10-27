@@ -89,6 +89,7 @@ Environment variables can be set directly in your shell or via a `.env` file (re
 Available environment variables:
 ```bash
 PORT=8080                     # Server port (default: 8080)
+JWT_SECRET=<random>          # Required: HS256 signing secret, at least 32 bytes (e.g. openssl rand -base64 48)
 GIN_MODE=debug               # Gin mode: debug or release
 DB_PATH=./data/gorm.db       # SQLite database path (default: ./data/gorm.db)
 TEST_DB_PATH=./data/test.db  # Optional: SQLite database path used for tests
@@ -97,6 +98,7 @@ TEST_DB_PATH=./data/test.db  # Optional: SQLite database path used for tests
 Example usage:
 ```bash
 # Option 1: Set environment variables directly
+export JWT_SECRET="$(openssl rand -base64 48)"
 export PORT=3000
 export DB_PATH=./data/myapp.db
 go run hello.go
@@ -117,7 +119,10 @@ go mod tidy
 ```
 
 ## Run the Server
+The server refuses to start without `JWT_SECRET` (see Environment Config).
 ```bash
+export JWT_SECRET="$(openssl rand -base64 48)"
+
 # Using default port 8080
 go run hello.go
 

@@ -3,8 +3,11 @@ package common
 
 import (
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"math/big"
+	"net/http"
+	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -37,9 +40,32 @@ func RandInt() int {
 	return int(randNum.Int64())
 }
 
-// Keep this two config private, it should not expose to open source
-const JWTSecret = "A String Very Very Very Strong!!@##$!@#$"      // #nosec G101
+// Sentinel used by the user validator to keep the current password; it is not a secret
 const RandomPassword = "A String Very Very Very Random!!@##$!@#4" // #nosec G101
+
+// JWTSecretEnv is the environment variable that holds the HS256 signing secret
+const JWTSecretEnv = "JWT_SECRET"
+
+// minJWTSecretLen is the minimum secret length: 32 bytes (256 bits) for HS256
+const minJWTSecretLen = 32
+
+var jwtSecret []byte
+
+// LoadJWTSecret reads the signing secret from JWT_SECRET.
+// There is no default: the server must refuse to start without a real secret.
+func LoadJWTSecret() error {
+	secret := os.Getenv(JWTSecretEnv)
+	if len(secret) < minJWTSecretLen {
+		return fmt.Errorf("%s must be set to a random value of at least %d bytes", JWTSecretEnv, minJWTSecretLen)
+	}
+	jwtSecret = []byte(secret)
+	return nil
+}
+
+// JWTSecret returns the secret loaded by LoadJWTSecret
+func JWTSecret() []byte {
+	return jwtSecret
+}
 
 // A Util function to generate jwt_token which can be used in the request header
 func GenToken(id uint) string {
@@ -47,8 +73,12 @@ func GenToken(id uint) string {
 		"id":  id,
 		"exp": time.Now().Add(time.Hour * 24).Unix(),
 	})
+	if len(JWTSecret()) == 0 {
+		fmt.Printf("failed to sign JWT token for id %d: %s is not loaded\n", id, JWTSecretEnv)
+		return ""
+	}
 	// Sign and get the complete encoded token as a string
-	token, err := jwt_token.SignedString([]byte(JWTSecret))
+	token, err := jwt_token.SignedString(JWTSecret())
 	if err != nil {
 		fmt.Printf("failed to sign JWT token for id %d: %v\n", id, err)
 		return ""
@@ -68,7 +98,12 @@ type CommonError struct {
 func NewValidatorError(err error) CommonError {
 	res := CommonError{}
 	res.Errors = make(map[string]interface{})
-	errs := err.(validator.ValidationErrors)
+	var errs validator.ValidationErrors
+	if !errors.As(err, &errs) {
+		// Malformed JSON or a wrong type: not a validation error, and must not panic
+		res.Errors["body"] = "invalid request body"
+		return res
+	}
 	for _, v := range errs {
 		// can translate each error one at a time.
 		//fmt.Println("gg",v.NameNamespace)
@@ -80,6 +115,16 @@ func NewValidatorError(err error) CommonError {
 
 	}
 	return res
+}
+
+// BindErrorStatus returns 422 for validation errors and 400 for anything else
+// returned by Bind (malformed JSON, wrong types), which is a client error too
+func BindErrorStatus(err error) int {
+	var errs validator.ValidationErrors
+	if errors.As(err, &errs) {
+		return http.StatusUnprocessableEntity
+	}
+	return http.StatusBadRequest
 }
 
 // Wrap the error info in an object

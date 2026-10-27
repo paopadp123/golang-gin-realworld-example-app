@@ -2,6 +2,7 @@ package common
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -10,8 +11,58 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestMain(m *testing.M) {
+	UseRandomJWTSecretForTests()
+	os.Exit(m.Run())
+}
+
+func TestLoadJWTSecretFailsWithoutEnv(t *testing.T) {
+	t.Setenv(JWTSecretEnv, "")
+	assert.Error(t, LoadJWTSecret(), "the server must not start without JWT_SECRET")
+}
+
+func TestLoadJWTSecretRejectsShortSecret(t *testing.T) {
+	t.Setenv(JWTSecretEnv, "too-short")
+	assert.Error(t, LoadJWTSecret(), "a short secret can be brute-forced offline")
+}
+
+func TestLoadJWTSecretUsesEnvValue(t *testing.T) {
+	asserts := assert.New(t)
+	secret := RandString(48)
+	t.Setenv(JWTSecretEnv, secret)
+
+	asserts.NoError(LoadJWTSecret())
+	asserts.Equal([]byte(secret), JWTSecret(), "tokens must be signed with the configured secret")
+
+	claims, err := VerifyTokenClaims(GenToken(7))
+	asserts.NoError(err, "a token signed with the configured secret should verify")
+	asserts.Equal(float64(7), claims["id"])
+}
+
+func TestNewValidatorErrorWithMalformedJSON(t *testing.T) {
+	asserts := assert.New(t)
+	err := json.Unmarshal([]byte(`{"user": `), &struct{}{})
+
+	var res CommonError
+	asserts.NotPanics(func() { res = NewValidatorError(err) }, "a non-validation error must not panic")
+	asserts.Contains(res.Errors, "body", "the client should learn that the body is invalid")
+}
+
+func TestBindErrorStatus(t *testing.T) {
+	asserts := assert.New(t)
+	syntaxErr := json.Unmarshal([]byte(`{"user": `), &struct{}{})
+	asserts.Equal(http.StatusBadRequest, BindErrorStatus(syntaxErr), "malformed JSON is a client error, not a validation error")
+
+	var payload struct {
+		Name string `validate:"required"`
+	}
+	validationErr := validator.New().Struct(payload)
+	asserts.Equal(http.StatusUnprocessableEntity, BindErrorStatus(validationErr), "validation errors keep 422")
+}
 
 func TestConnectingDatabase(t *testing.T) {
 	asserts := assert.New(t)

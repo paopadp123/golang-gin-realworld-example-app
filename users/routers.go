@@ -78,7 +78,7 @@ func ProfileUnfollow(c *gin.Context) {
 func UsersRegistration(c *gin.Context) {
 	userModelValidator := NewUserModelValidator()
 	if err := userModelValidator.Bind(c); err != nil {
-		c.JSON(http.StatusUnprocessableEntity, common.NewValidatorError(err))
+		c.JSON(common.BindErrorStatus(err), common.NewValidatorError(err))
 		return
 	}
 
@@ -94,7 +94,7 @@ func UsersRegistration(c *gin.Context) {
 func UsersLogin(c *gin.Context) {
 	loginValidator := NewLoginValidator()
 	if err := loginValidator.Bind(c); err != nil {
-		c.JSON(http.StatusUnprocessableEntity, common.NewValidatorError(err))
+		c.JSON(common.BindErrorStatus(err), common.NewValidatorError(err))
 		return
 	}
 	userModel, err := FindOneUser(&UserModel{Email: loginValidator.userModel.Email})
@@ -122,7 +122,7 @@ func UserUpdate(c *gin.Context) {
 	myUserModel := c.MustGet("my_user_model").(UserModel)
 	userModelValidator := NewUserModelValidatorFillWith(myUserModel)
 	if err := userModelValidator.Bind(c); err != nil {
-		c.JSON(http.StatusUnprocessableEntity, common.NewValidatorError(err))
+		c.JSON(common.BindErrorStatus(err), common.NewValidatorError(err))
 		return
 	}
 

@@ -33,6 +33,10 @@ func UpdateContextUserModel(c *gin.Context, my_user_id uint) {
 		db := common.GetDB()
 		db.First(&myUserModel, my_user_id)
 	}
+	setContextUser(c, my_user_id, myUserModel)
+}
+
+func setContextUser(c *gin.Context, my_user_id uint, myUserModel UserModel) {
 	c.Set("my_user_id", my_user_id)
 	c.Set("my_user_model", myUserModel)
 }
@@ -57,7 +61,11 @@ func AuthMiddleware(auto401 bool) gin.HandlerFunc {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, jwt.ErrSignatureInvalid
 			}
-			return []byte(common.JWTSecret), nil
+			secret := common.JWTSecret()
+			if len(secret) == 0 {
+				return nil, jwt.ErrInvalidKey
+			}
+			return secret, nil
 		})
 
 		if err != nil {
@@ -69,7 +77,16 @@ func AuthMiddleware(auto401 bool) gin.HandlerFunc {
 
 		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 			my_user_id := uint(claims["id"].(float64))
-			UpdateContextUserModel(c, my_user_id)
+			var myUserModel UserModel
+			if err := common.GetDB().First(&myUserModel, my_user_id).Error; err != nil {
+				// Valid signature, but the user is gone (deleted, or the lookup failed):
+				// never act on its behalf
+				if auto401 {
+					c.AbortWithStatus(http.StatusUnauthorized)
+				}
+				return
+			}
+			setContextUser(c, my_user_id, myUserModel)
 		}
 	}
 }

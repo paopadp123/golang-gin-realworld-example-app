@@ -1592,6 +1592,7 @@ func TestCommentDeleteAuthorizationForbidden(t *testing.T) {
 
 // This is a hack way to add test database for each case
 func TestMain(m *testing.M) {
+	common.UseRandomJWTSecretForTests()
 	test_db = common.TestDBInit()
 	users.AutoMigrate()
 	test_db.AutoMigrate(&ArticleModel{})

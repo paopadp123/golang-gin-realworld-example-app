@@ -17,7 +17,7 @@ go build -o app hello.go
 
 # Start the server
 echo "Starting server..."
-PORT=8080 ./app &
+PORT=8080 JWT_SECRET="${JWT_SECRET:-$(head -c 48 /dev/urandom | base64)}" ./app &
 SERVER_PID=$!
 
 # Cleanup function to kill server on exit
