@@ -38,7 +38,7 @@ func TagsAnonymousRegister(router *gin.RouterGroup) {
 func ArticleCreate(c *gin.Context) {
 	articleModelValidator := NewArticleModelValidator()
 	if err := articleModelValidator.Bind(c); err != nil {
-		c.JSON(http.StatusUnprocessableEntity, common.NewValidatorError(err))
+		c.JSON(common.BindErrorStatus(err), common.NewValidatorError(err))
 		return
 	}
 	//fmt.Println(articleModelValidator.articleModel.Author.UserModel)
@@ -113,7 +113,7 @@ func ArticleUpdate(c *gin.Context) {
 
 	articleModelValidator := NewArticleModelValidatorFillWith(articleModel)
 	if err := articleModelValidator.Bind(c); err != nil {
-		c.JSON(http.StatusUnprocessableEntity, common.NewValidatorError(err))
+		c.JSON(common.BindErrorStatus(err), common.NewValidatorError(err))
 		return
 	}
 
@@ -187,7 +187,7 @@ func ArticleCommentCreate(c *gin.Context) {
 	}
 	commentModelValidator := NewCommentModelValidator()
 	if err := commentModelValidator.Bind(c); err != nil {
-		c.JSON(http.StatusUnprocessableEntity, common.NewValidatorError(err))
+		c.JSON(common.BindErrorStatus(err), common.NewValidatorError(err))
 		return
 	}
 	commentModelValidator.commentModel.Article = articleModel

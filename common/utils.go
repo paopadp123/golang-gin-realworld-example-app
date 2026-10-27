@@ -3,6 +3,7 @@ package common
 
 import (
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -97,7 +98,12 @@ type CommonError struct {
 func NewValidatorError(err error) CommonError {
 	res := CommonError{}
 	res.Errors = make(map[string]interface{})
-	errs := err.(validator.ValidationErrors)
+	var errs validator.ValidationErrors
+	if !errors.As(err, &errs) {
+		// Malformed JSON or a wrong type: not a validation error, and must not panic
+		res.Errors["body"] = "invalid request body"
+		return res
+	}
 	for _, v := range errs {
 		// can translate each error one at a time.
 		//fmt.Println("gg",v.NameNamespace)
@@ -111,10 +117,14 @@ func NewValidatorError(err error) CommonError {
 	return res
 }
 
-// BindErrorStatus returns the HTTP status for an error returned by Bind
-// TODO: stub for the failing tests; always 422 as before
+// BindErrorStatus returns 422 for validation errors and 400 for anything else
+// returned by Bind (malformed JSON, wrong types), which is a client error too
 func BindErrorStatus(err error) int {
-	return http.StatusUnprocessableEntity
+	var errs validator.ValidationErrors
+	if errors.As(err, &errs) {
+		return http.StatusUnprocessableEntity
+	}
+	return http.StatusBadRequest
 }
 
 // Wrap the error info in an object
