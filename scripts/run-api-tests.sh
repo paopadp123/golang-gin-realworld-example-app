@@ -9,7 +9,10 @@ rm -f ./data/gorm.db
 
 # Download Postman collection
 echo "Downloading Postman collection..."
-curl -L -s https://raw.githubusercontent.com/gothinkster/realworld/main/api/Conduit.postman_collection.json -o ./tmp/Conduit.postman_collection.json
+# The spec moved to realworld-apps/realworld and the Postman collection was removed in 0e68ba1;
+# pin the last commit that still has it, so the download does not break again
+COLLECTION_SHA=58acb59604f32db6f887b349a7cdc636760e2337
+curl -L -s -f "https://raw.githubusercontent.com/realworld-apps/realworld/${COLLECTION_SHA}/specs/api/legacy_Conduit.postman_collection.json" -o ./tmp/Conduit.postman_collection.json
 
 # Build the application
 echo "Building application..."
