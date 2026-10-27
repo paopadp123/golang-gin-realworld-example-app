@@ -345,9 +345,9 @@ var unauthRequestTests = []struct {
 		"/user/",
 		"PUT",
 		`{"password": "password321"}}`,
-		http.StatusUnprocessableEntity,
-		`{"errors":{"Email":"{key: required}","Username":"{key: required}"}}`,
-		"test database pk error for user update",
+		http.StatusUnauthorized,
+		`^$`,
+		"token of a user that does not exist should be rejected before the update",
 	},
 	{
 		func(req *http.Request) {
@@ -356,9 +356,9 @@ var unauthRequestTests = []struct {
 		"/user/",
 		"PUT",
 		`{"user":{"username": "wangzitian0","email": "wzt@gg.cn","password": "jakejxke"}}`,
-		http.StatusUnprocessableEntity,
-		`{"errors":{"database":"WHERE conditions required"}}`,
-		"cheat validator and test database connecting error for user update",
+		http.StatusUnauthorized,
+		`^$`,
+		"token with user id 0 should be rejected before the update",
 	},
 	{
 		func(req *http.Request) {
