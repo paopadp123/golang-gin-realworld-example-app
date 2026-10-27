@@ -22,6 +22,9 @@ func Migrate(db *gorm.DB) {
 }
 
 func main() {
+	if err := common.LoadJWTSecret(); err != nil {
+		log.Fatal(err)
+	}
 
 	db := common.Init()
 	Migrate(db)
